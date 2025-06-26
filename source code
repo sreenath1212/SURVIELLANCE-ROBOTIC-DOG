@@ -1,0 +1,447 @@
+#include <xc.h>
+#include "config.h"
+#include "I2C.h"
+#include "Motor.h"
+#include <stdlib.h>
+#define PIR PORTAbits.RA0
+#define ECHO      PORTBbits.RB1
+#define TRIGGER   PORTBbits.RB0
+#define BARKING_SOUND PORTEbits.RE1 
+unsigned char x_temp,y_temp;
+unsigned char temp_data;
+
+int ultra(){
+
+    int a,b;
+    TMR1H = 0;                //Sets the Initial Value of Timer
+    TMR1L = 0;                //Sets the Initial Value of Timer
+
+    TRIGGER = 1;                  //TRIGGER HIGH
+    __delay_us(10);           //10uS Delay 
+    TRIGGER = 0;                  //TRIGGER LOW
+
+    while(!ECHO);              //Waiting for Echo
+    TMR1ON = 1;               //Timer Starts
+while(ECHO);               //Waiting for Echo goes LOW
+    TMR1ON = 0;               //Timer Stops
+
+    a = (TMR1L | (TMR1H<<8)); //Reads Timer Value
+    b = a;
+    a = a/58.82;              //Converts Time to Distance
+    a = a + 1;      
+    //Distance Calibration
+
+    if(a>=2 && a<=400)        //Check whether the result is valid or not
+    { 
+LCD_Clear();
+LCD_Set_Cursor(1,1);
+LCD_Write_String("Distance = ");
+
+LCD_Set_Cursor(1,14);
+LCD_Write_Char(a%10 + 48);
+
+      a = a/10;
+LCD_Set_Cursor(1,13);
+LCD_Write_Char(a%10 + 48);
+
+      a = a/10;
+LCD_Set_Cursor(1,12);
+LCD_Write_Char(a%10 + 48);
+
+LCD_Set_Cursor(1,15);
+LCD_Write_String("cm");
+    }
+    else
+    {
+LCD_Clear();
+LCD_Set_Cursor(1,1);
+LCD_Write_String("Out of Range");
+    }
+    __delay_ms(400);
+    return b;
+}
+int check_block()
+{
+if(PORTAbits.RA0)
+        return 1;
+temp_data = PORTA;
+temp_data = temp_data;
+   if(temp_data)
+   {
+LCD_Set_Cursor(1, 1);
+LCD_Write_String("BLOCK AHEAD");
+   }
+   else
+   {
+LCD_Set_Cursor(1, 1);
+LCD_Write_String("  NO BLOCK ");
+
+   }
+   __delay_ms(500);
+   return temp_data;
+}
+
+
+void Blink_LED(int k)
+{
+
+for(int i = 0;i<k;i++)
+    {
+      __delay_ms(100);
+        PORTCbits.RC0 = 0;
+      __delay_ms(100);
+        PORTCbits.RC0 = 1;
+    }
+}
+
+
+
+
+// Read the compass heading.  This is in units
+// of 1/10's of a degree, from 0 to 3599.
+
+void Display_heading()
+{
+
+    int j;
+LCD_Set_Cursor(1, 1);
+LCD_Write_String("  AI ROBO DOG  ");
+LCD_Set_Cursor(2, 1);  
+LCD_Write_String("CAS MAVELIKKARA");
+    __delay_ms(3000);
+LCD_Clear();
+LCD_Set_Cursor(1, 1);
+LCD_Write_String("SREENATH, SIJO,");
+LCD_Set_Cursor(2, 1);  
+LCD_Write_String("AKSHAY, ");
+    __delay_ms(3000);
+LCD_Clear();
+LCD_Set_Cursor(1, 1);
+LCD_Write_String("GUIDANCE SUPPORT");
+LCD_Set_Cursor(2, 1);  
+LCD_Write_String("   AJEESH R     ");
+    __delay_ms(3000);
+LCD_Set_Cursor(1, 1);
+LCD_Write_String("ADJST PIR SENSOR");
+LCD_Set_Cursor(2, 1);
+LCD_Write_String(" FACING FORWARD ");
+        __delay_ms(3000);
+LCD_Set_Cursor(1, 1);
+LCD_Write_String("PLACE ROBO IN   ");
+LCD_Set_Cursor(2, 1);
+LCD_Write_String("ANY FREE PATH   "); 
+         __delay_ms(3000);
+LCD_Clear();
+
+Blink_LED(3);
+LCD_Set_Cursor(1,1);
+LCD_Write_String("PRESS CLIP SWITCH TO START"); 
+         __delay_ms(500);
+for(j = 0;j<20;j++)
+                 {
+                    LCD_SL();
+                    __delay_ms(200);
+                 }
+LCD_Clear();
+LCD_Set_Cursor(1,1);
+LCD_Write_String("DO CLIP TO START");
+x_temp = '*';
+y_temp = '*';
+         __delay_ms(500);
+    while(!PORTEbits.RE0)
+    {
+
+y_temp = y_temp ^ x_temp; 
+LCD_Set_Cursor(2,7);   
+LCD_Write_Char(y_temp);
+       __delay_ms(200);
+    }
+
+}
+
+void Init_System()
+{
+    TRISEbits.TRISE2 = 0;
+
+    TRISEbits.TRISE0 = 1;
+    ADCON1 = 6;
+    CMCON = 0x07;
+    TRISD = 0X00;
+     TRISEbits.TRISE2 = 0;
+
+    TRISEbits.TRISE0 = 1;
+TRISEbits.PSPMODE = 0;
+    TRISEbits.TRISE1 = 0;
+    TRISA =0xFF; 
+    TRISEbits.TRISE0 = 1;
+    TRISCbits.TRISC0 = 0;
+    TRISBbits.TRISB0 = 0;
+    TRISBbits.TRISB1 = 1;
+    T1CON = 0x10;   //Initialize Timer Module
+    TRISBbits.TRISB2 = 0;
+    TRISBbits.TRISB3 = 0;
+    TRISBbits.TRISB4 = 0;
+    TRISBbits.TRISB5 = 0;
+    TRISEbits.TRISE2 = 0;
+    PORTEbits.RE2 = 0;
+}
+void main(void) {
+    int heading;
+    int i,j,c,distance;
+    char buff[10];
+
+    I2C__Init();
+Blink_LED(3);
+LCD_Init(0x4E); 
+Blink_LED(3);// Initialize LCD module with I2C address = 0x4E
+Init_System();
+stop(); // avoid unnecessary robo movements
+Blink_LED(3);
+
+    //Display_heading();    
+   // heading = HMC6352_read_heading();
+LCD_Clear();
+LCD_Set_Cursor(1,1);
+LCD_Write_String("checking block");
+    __delay_ms(2500);
+
+    c = search(CW);
+for(i = 0;i<c*20;i++)
+FRot(CCW);
+    c = search(CCW);
+for(i = 0;i<c*20;i++)
+FRot(CW);
+while(1);
+
+
+                heading = HMC6352_read_heading();
+itoa(buff,heading,10);
+LCD_Clear();
+LCD_Set_Cursor(1, 1);
+LCD_Write_String(buff);
+                __delay_ms(500);
+
+
+
+    c = check_block();
+    if(c){
+if(c == 1)
+         {
+             distance = ultra();
+            BARKING_SOUND = 1;
+            __delay_ms(200);
+            BARKING_SOUND = 1;
+            PORTD = 0XF0;
+
+         }
+Blink_LED(10);
+     c = 0;
+
+while(1)
+    {   
+
+if(PIR){
+            distance = ultra();
+            BARKING_SOUND = 1;
+            __delay_ms(200);
+            BARKING_SOUND = 1;
+            PORTD = 0XF0;
+            __delay_ms(500);
+             BARKING_SOUND = 0;
+         }
+            if (c){
+for(i = 0;i<c*20;i++)
+FRot(CCW);
+                heading = HMC6352_read_heading();
+itoa(buff,heading,10);
+LCD_Clear();
+LCD_Set_Cursor(1, 1);
+LCD_Write_String(buff);
+                __delay_ms(500);
+
+
+            }
+            else
+            {
+                if(check_block())
+                {
+LCD_Set_Cursor(1, 1);
+LCD_Write_String("Avoiding Block");
+                    __delay_ms(200);
+avoid_block();
+                }
+                if(!PIR){
+LCD_Set_Cursor(1, 1);
+LCD_Write_String("GOING FORWARD");
+                    __delay_ms(200);
+front();
+                    __delay_ms(200);
+stop();
+                }
+            }
+        }
+
+        __delay_ms(500);
+
+     }
+    return;
+}
+void FRot (int direction){
+    if (direction == CCW){
+        PORTD = 0b00000011;
+ms_Delay(speed);
+        PORTD = 0b00000110;
+ms_Delay(speed);
+        PORTD = 0b00001100;
+ms_Delay(speed);
+        PORTD = 0b00001001;
+ms_Delay(speed);
+        PORTD = 0b00000011;
+ms_Delay(speed);
+    }
+    if (direction == CW){
+        PORTD = 0b00001001;
+ms_Delay(speed);
+        PORTD = 0b00001100;
+ms_Delay(speed);
+        PORTD = 0b00000110;
+ms_Delay(speed);
+        PORTD = 0b00000011;
+ms_Delay(speed);
+        PORTD = 0b00001001;
+ms_Delay(speed);
+    }
+}
+
+void ms_Delay(unsigned int val)
+{
+    unsigned int i,j;
+        for(i=0;i<val;i++)
+            for(j=0;j<1650;j++);
+   // __delay_us(1150);
+            //__delay_ms(500);
+}
+
+void front(void)
+{
+   __delay_ms(5);
+   IN1  = 1;
+   IN2 = 0;
+   IN3 = 1;
+   IN4 = 0;
+      __delay_ms(5);
+
+
+}
+void back(void)
+{
+     __delay_ms(5);
+
+    IN1  = 0;
+   IN2 = 1;
+   IN3 = 0;
+   IN4 = 1; 
+      __delay_ms(5);
+
+}
+void right(void)
+{
+       __delay_ms(5);
+
+   IN1  = 1;
+   IN2 = 0;
+   IN3 = 0;
+   IN4 = 1; 
+   __delay_ms(5);
+
+}
+void left(void)
+{
+    __delay_ms(5);
+
+   IN1  = 0;
+   IN2 = 1;
+   IN3 = 1;
+   IN4 = 0; 
+   __delay_ms(5);
+
+}
+void stop(void){
+    __delay_ms(5);
+    IN1 = 0;
+    IN2 = 0;
+    IN3 = 0;
+    IN4 = 0;
+    __delay_ms(50);
+}
+
+void  servo_one_step(int dir){
+for(int i = 0; i<20;i++){
+FRot(dir);
+    }
+}
+void avoid_block(void)
+{
+    char bf[10];
+    unsigned char  p;
+if(PORTAbits.RA0)
+        return;
+back();
+    __delay_ms(200);
+stop();
+    p = PORTA;
+    p = p & 0xFE;
+    if(!p)
+       return;
+
+LCD_Clear(); 
+    __delay_ms(500);
+   while(p)
+    {
+       __delay_ms(100);
+
+    switch(p)
+    {
+        case 2: LCD_Write_String("val 2");
+back();
+                __delay_ms(200);
+stop();
+left();
+                __delay_ms(200);
+stop();
+                break;
+        case 6: LCD_Write_String("val 6");
+back();
+                 __delay_ms(400);
+stop();
+left();
+                __delay_ms(200);
+stop();
+                break;
+        case 32:LCD_Write_String("val 32");
+back();
+                __delay_ms(200);
+stop();
+right();
+                __delay_ms(200);
+stop();
+                break;
+        case 48:LCD_Write_String("val 48");
+back();
+               __delay_ms(400);
+stop();
+right();
+                __delay_ms(200);
+stop();
+               break;
+                __delay_ms(200);
+    }
+    p = PORTA;
+    p = p & 0xFE;
+itoa(bf,p,10);
+LCD_Clear();    
+LCD_Set_Cursor(1,1);
+LCD_Write_String(bf);
+            __delay_ms(500);    
+    }
+
